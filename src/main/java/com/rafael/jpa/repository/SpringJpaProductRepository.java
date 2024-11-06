@@ -1,4 +1,4 @@
-package com.rafael.jpa.service;
+package com.rafael.jpa.repository;
 
 import com.rafael.jpa.model.Product;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
-@EnableJpaRepositories(basePackages = "com.rafael.jpa.service")
+@EnableJpaRepositories(basePackages = "com.rafael.jpa.repository")
 @EnableTransactionManagement
 @SpringBootApplication
 public class JpaApplication {

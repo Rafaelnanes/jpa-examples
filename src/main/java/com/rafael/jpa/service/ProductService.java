@@ -1,6 +1,7 @@
 package com.rafael.jpa.service;
 
 import com.rafael.jpa.model.Product;
+import com.rafael.jpa.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

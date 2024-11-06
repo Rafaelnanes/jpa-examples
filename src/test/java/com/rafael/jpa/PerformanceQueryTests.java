@@ -1,48 +1,42 @@
 package com.rafael.jpa;
 
 import com.rafael.jpa.model.Product;
-import com.rafael.jpa.service.ProductService;
-import com.rafael.jpa.service.SpringJpaProductRepository;
 import lombok.extern.slf4j.Slf4j;
 import net.ttddyy.dsproxy.QueryCountHolder;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.annotation.DirtiesContext;
-
-import java.util.List;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @Slf4j
 @SpringBootTest
-@DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
-class JpaApplicationTests {
+class PerformanceQueryTests extends AbstractTestCase {
 
   private static final int PRODUCT_ID = 1;
 
-  @Autowired
-  private ProductService productService;
+  /**
+   * The best scenario: Chaining transactions makes hibernate only run select once.
+   */
+  @Test
+  void chainTransactional() {
+    final TransactionStatus transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
 
-  @Autowired
-  private SpringJpaProductRepository springJpaProductRepository;
+    final Product product = productService.find(PRODUCT_ID);
+    productService.decrementAndMerge(product);
+    final Product productFromDb = productService.find(PRODUCT_ID);
 
-  @BeforeEach
-  void each() {
-    springJpaProductRepository.save(new Product(PRODUCT_ID, "Bag", 3));
-    springJpaProductRepository.save(new Product(2, "Bottle", 7));
-    springJpaProductRepository.save(new Product(3, "Pc", 5));
-    QueryCountHolder.clear();
+    transactionManager.commit(transaction);
+
+    assertEquals(productFromDb.getStock(), 2);
+    assertEquals(1, QueryCountHolder.getGrandTotal().getSelect()); //just once
+    assertEquals(1, QueryCountHolder.getGrandTotal().getUpdate());
   }
 
-  @AfterEach
-  void wipeData() {
-    final List<Product> products = springJpaProductRepository.findAll();
-    springJpaProductRepository.deleteAll(products);
-  }
-
+  /**
+   * Bad scenario
+   */
   @Test
   void unnecessarySelectQueryBecauseWasNotInTransaction() {
     final Product product = productService.find(PRODUCT_ID);
@@ -54,6 +48,9 @@ class JpaApplicationTests {
     assertEquals(PRODUCT_ID, QueryCountHolder.getGrandTotal().getUpdate());
   }
 
+  /**
+   * Stock has not changed because the entity as detached and was no merged or saved
+   */
   @Test
   void stockNotChanged() {
     final Product product = productService.find(PRODUCT_ID);
@@ -62,11 +59,15 @@ class JpaApplicationTests {
 
     assertEquals(productFromDb.getStock(), 3);// not changed
     assertEquals(2, QueryCountHolder.getGrandTotal().getSelect());
-    assertEquals(0, QueryCountHolder.getGrandTotal().getUpdate()); //no inserts
+    assertEquals(0, QueryCountHolder.getGrandTotal().getUpdate()); //no updates
   }
 
+  /**
+   * After finishing the transaction the entity manager triggers
+   * flush by a dirty check(Entity manager will verify if there is difference between the classes and then run db update)
+   */
   @Test
-  void mergeByFlush() {
+  void mergeByFlushAutomatically() {
     productService.decrementWithNoMerge(PRODUCT_ID);
     final Product productFromDb = productService.find(PRODUCT_ID);
 
